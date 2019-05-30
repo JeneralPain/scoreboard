@@ -961,7 +961,11 @@ function createPeriodDialog() {
 	$("<a>").text("Duration").addClass("Title")
 		.appendTo(headers.children("td:eq(2)").addClass("Title"));
 
-	WS.Register(['ScoreBoard.Period'], function (k, v) {
+	WS.Register([
+			'ScoreBoard.Period(*).CurrentJamNumber',
+			'ScoreBoard.Period(*).Duration',
+			'ScoreBoard.Period(*).Number',
+			'ScoreBoard.Period(*).Running'], function (k, v) {
 		var nr = k.Period;
 		if (nr == null || nr == 0) { return; }
 		var prefix = "ScoreBoard.Period(" + nr + ")";
@@ -1030,16 +1034,16 @@ function createJamDialog() {
 		.appendTo(headers.children("td:eq(3)").addClass("Title"));
 	var currentPeriod;
 
-	WS.Register(['ScoreBoard.Period'], function (k, v) {
+	WS.Register([
+			'ScoreBoard.Period(*).Jam(*).Duration',
+			'ScoreBoard.Period(*).Jam(*).Number',
+			'ScoreBoard.Period(*).Jam(*).PeriodClockDisplayEnd',
+			'ScoreBoard.Period(*).Jam(*).TeamJam(*).JamScore'], function (k, v) {
 		var per = k.Period;
 		if (per == 0) { return; }
 		var nr = k.Jam;
 		var prefix = "ScoreBoard.Period(" + per + ").Jam(" + nr + ")";
-		var tj = k.TeamJam;
-		var tjPrefix = prefix + ".TeamJam(" + tj + ")";
 		var key = k.field;
-		if (!((k == prefix + "." + key && ["Duration", "Number", "PeriodClockDisplayEnd"].includes(key))
-				|| k == tjPrefix + ".JamScore")) { return; }
 		
 		var table = dialog.find("table.Period[nr="+per+"]");
 		if (table.length == 0 && v != null) {
@@ -1083,7 +1087,7 @@ function createJamDialog() {
 			return;
 		}
 		if (v != null) {
-			if (key == "JamScore") { row.find("td.Points ."+tj).text(v); }
+			if (key == "JamScore") { row.find("td.Points ."+k.TeamJam).text(v); }
 			if (key == "Duration") {
 				if (WS.state[prefix + '.WalltimeEnd'] == 0 && WS.state[prefix + '.WalltimeStart'] > 0) {
 					row.children("td.Duration").text("running");
@@ -1117,10 +1121,10 @@ function createJamDialog() {
 }
 
 function createTimeoutDialog() {
-	var lastPeriodRegistered = 2;
+	var lastPeriodRegistered = 0;
 	var lastPeriodListed = 0;
-	var firstJamListed = [0, 0, 0];
-	var lastJamListed = [0, 0, 0];
+	var firstJamListed = [0];
+	var lastJamListed = [0];
 	var periodDropdownTemplate = $('<select>').attr('id', 'PeriodDropdown')
 		.append($('<option>').attr('value', 0).text('P0'));
 	var jamDropdownTemplate = [$('<select>').attr('id', 'JamDropdown').attr('period', 0)
@@ -1166,8 +1170,6 @@ function createTimeoutDialog() {
 			firstJamListed[i] = 0;
 			lastJamListed[i] = 0;
 			jamDropdownTemplate[i] = $('<select>').attr('id', 'JamDropdown').attr('period', i);
-			WS.Register(['ScoreBoard.Period('+i+').CurrentJamNumber', 'ScoreBoard.Period('+i+').FirstJamNumber'], processJamNumber);
-			WS.Register(['ScoreBoard.Period('+i+').Timeout'], processTimeout);
 			lastPeriodRegistered = i;
 		}
 		for (i = lastPeriodListed + 1; i <= p; i++) {
@@ -1184,6 +1186,10 @@ function createTimeoutDialog() {
 		}
 		footer.find('#PeriodDropdown').val(p);
 	});
+	WS.Register(['ScoreBoard.Period(*).CurrentJamNumber', 'ScoreBoard.Period(*).FirstJamNumber'], processJamNumber);
+
+	WS.Register(['ScoreBoard.Period(*).CurrentJam', 'ScoreBoard.Period(*).Jam(*).Id']);
+	WS.Register(['ScoreBoard.Period(*).Timeout'], processTimeout);
 	
 	function addJam(p, j, append) {
 		var option = $('<option>').attr('value', j).text('J'+j);
@@ -1319,12 +1325,6 @@ function createTimeoutDialog() {
 				break;
 		}
 	}
-	// Period 1 and 2 registers are for performance reasons as doing them initially speeds up page load with
-	// the current WS implementation.
-	WS.Register(['ScoreBoard.Period(1).CurrentJamNumber', 'ScoreBoard.Period(1).FirstJamNumber', 
-		'ScoreBoard.Period(2).CurrentJamNumber', 'ScoreBoard.Period(2).FirstJamNumber'], processJamNumber);
-	WS.Register(['ScoreBoard.Period(0).Timeout', 'ScoreBoard.Period(1).Timeout', 
-		'ScoreBoard.Period(2).Timeout'], processTimeout);
 	
 	return dialog.dialog({
 		title: "Timeouts",
